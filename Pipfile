@@ -11,6 +11,11 @@ name = "pypi"
 
 [packages]
 
+pytesseract = "==0.2.*"
+selenium = "==3.12.*"
+pyvirtualdisplay = "==0.2.*"
+python-dotenv = "==0.8.*"
+"psycopg2" = "*"
 
 
 [requires]
