@@ -18,7 +18,7 @@ from selenium.webdriver.support import expected_conditions as EC
 from pyvirtualdisplay import Display
 from selenium.common.exceptions import WebDriverException, NoSuchElementException, TimeoutException
 
-class TestCantonfairSite(unittest.TestCase):
+class TestFCMotoDESite(unittest.TestCase):
 
     def setUp(self):
         # initialize logget
@@ -30,8 +30,8 @@ class TestCantonfairSite(unittest.TestCase):
         self.logger.setLevel(logging.WARNING)
         self.logger.propagate = False
 
-        self.display = Display(visible=0, size=(1024,800))
-        self.display.start()
+        # self.display = Display(visible=0, size=(1024,800))
+        # self.display.start()
 
         self.current_path = os.path.dirname(os.path.realpath(__file__))
         self.chromedriver_path = os.path.join(self.current_path, 'chromedriver')
@@ -45,51 +45,48 @@ class TestCantonfairSite(unittest.TestCase):
 
             initial_wait = WebDriverWait(driver, 60*60)
             initial_wait.until(
-                EC.presence_of_element_located((By.CSS_SELECTOR, '#pagearea'))
+                EC.presence_of_element_located((By.CSS_SELECTOR, '.CategoryList'))
             )
 
-            category = self.get_element_by_css_selector('#curmb > a')
-            category = category.text if category else 'International Pavilion'
+            categories = driver.find_elements_by_css_selector('span[itemprop="itemListElement"] span[itemprop="name"]')
+            self.categories = [category.text for category in categories][1:]
 
-            pages = driver.find_elements_by_css_selector('.pagenumber > a')
+            pages = driver.find_elements_by_css_selector('li > a[rel="next"]')
             pages = [page.text for page in pages]
             if len(pages) > 1:
-                end_page_id = pages[-1]
+                end_page_id = pages[-2]
             else:
                 end_page_id = 1
         except Exception as e:
             self.logger.exception(str(e))
             end_page_id = 0
-        return (int(end_page_id), category)
+        return int(end_page_id)
 
-    def get_exhibitors_links(self, category_url, max_page):
+    def get_product_links(self, category_url):
         driver = self.driver
-
+        end_page_id = self.get_category_max_page(category_url)
+        page_size = 60
         links = []
 
         try:
-            try:
-                driver.get(category_url)
+            time.sleep(0.5)
+            for page in range(1, end_page_id + 1):
+                page_url = 'https://www.fc-moto.de/epages/fcm.sf/ru_RU/?ViewAction=View&ObjectID=2693575&PageSize={page_size}&Page={page}'.format(page_size=page_size, page=page)
+                driver.get(page_url)
 
-                initial_wait = WebDriverWait(driver, 3*60)
-                initial_wait.until(
-                    EC.presence_of_element_located((By.CSS_SELECTOR, '#pagearea'))
-                )
-
-                links.extend([link.get_attribute('href') for link in self.get_elements_by_css_selector('#gjh_pro_result .czs-list > .min > dl > dt > a[target="_blank"]')])
-
-                common_wait = WebDriverWait(driver, 3*60)
-                for page_id in range(2, max_page + 1):
-                    print(page_id)
-                    page_button = self.get_element_by_css_selector('.pagenumber > a[_pageindex="{page_id}"'.format(page_id=page_id))
-                    page_button.click()
-                    common_wait.until(
-                        EC.presence_of_element_located((By.XPATH,  "//span[contains(@class, 'page_cur') and text() = '{page_id}']".format(page_id=page_id)))
+                try:
+                    initial_wait = WebDriverWait(driver, 3*60)
+                    initial_wait.until(
+                        EC.presence_of_element_located((By.CSS_SELECTOR, '.CategoryList'))
                     )
-                    links.extend([link.get_attribute('href') for link in self.get_elements_by_css_selector('#gjh_pro_result .czs-list > .min > dl > dt > a[target="_blank"]')])
 
-            except (NoSuchElementException, TimeoutException):
-                print('--> Page stalled')
+                    products = driver.find_elements_by_css_selector('.InfoArea .Headline a[itemprop="url"]')
+                    product_links = [product.get_attribute('href') for product in products]
+                    links.extend(product_links)
+
+                    time.sleep(0.5)
+                except (NoSuchElementException, TimeoutException):
+                    print('--> Page stalled')
 
         except Exception as e:
             self.logger.exception(str(e))
@@ -112,65 +109,78 @@ class TestCantonfairSite(unittest.TestCase):
             elements = None
         return elements
 
-    def get_exhibitors_data(self, exhibitors_url):
+    def get_product(self, product_url):
         driver = self.driver
+        product = None
         try:
-            driver.get(exhibitors_url)
+            driver.get(product_url)
             try:
                 initial_wait = WebDriverWait(driver, 3*60)
                 initial_wait.until(
-                    EC.presence_of_element_located((By.CSS_SELECTOR, '#content .cright'))
+                    EC.presence_of_element_located((By.CSS_SELECTOR, '.ContentAreaWrapper'))
                 )
 
-                address = self.get_element_by_css_selector('#Exhi_Address')
-                address = address.text if address else ''
+                common_wait = WebDriverWait(driver, 3*60)
 
-                business_type = self.get_element_by_css_selector('#Exhi_TypeName')
-                business_type = business_type.text if business_type else ''
+                # 'Наименование',
+                name = self.get_element_by_css_selector('.ICProductVariationArea [itemprop="name"]')
+                name = name.text if name else ''
 
-                city_province = self.get_element_by_css_selector('#Exhi_Province')
-                city_province = city_province.text if city_province else ''
+                # 'Производитель',
+                manufacturer = self.get_element_by_css_selector('.ICProductVariationArea [itemprop="manufacturer"]')
+                manufacturer = manufacturer.text if manufacturer else ''
 
-                company_name = self.get_element_by_css_selector('#Exhi_Name')
-                company_name = company_name.text if company_name else ''
+                # 'Цвета',
+                colors = self.get_element_by_css_selector('.ICVariationSelect .Headline.image .Bold.Value')
+                colors = colors.text if colors else ''
 
-                exhibition_records = self.get_element_by_css_selector('#Exhi_Record')
-                exhibition_records = exhibition_records.text if exhibition_records else ''
+                # 'Все размеры',
+                all_size = self.get_elements_by_css_selector('.ICVariationSelect li > button')
+                all_size = set([size.text for size in all_size] if all_size else [])
 
-                international_commercial_terms = self.get_element_by_css_selector('#Exhi_OEMode')
-                international_commercial_terms = international_commercial_terms.text if international_commercial_terms else ''
+                # 'Неактивные размеры',
+                disabled_size = self.get_elements_by_css_selector('.ICVariationSelect li.disabled > button')
+                disabled_size = set([size.text for size in disabled_size] if disabled_size else [])
 
-                main_products = self.get_element_by_css_selector('#Exhi_KeyWord')
-                main_products = main_products.text if main_products else ''
+                # 'Активные размеры',
+                active_size = all_size.difference(disabled_size)
 
-                number_of_staff = self.get_element_by_css_selector('#Exhi_PeopleNum')
-                number_of_staff = number_of_staff.text if number_of_staff else ''
+                # 'Цена',
+                price = self.get_element_by_css_selector('.PriceArea .Price')
+                price = price.text if price else ''
+                price_cleaned = price.replace('руб.', '').replace(' ', '').replace(',', '.')
 
-                post_code = self.get_element_by_css_selector('#Exhi_ZipCode')
-                post_code = post_code.text if post_code else ''
+                # 'Фотография'
+                front_picture = self.get_element_by_css_selector('#ICImageMediumLarge')
+                front_picture = front_picture.get_attribute('src') if front_picture else ''
 
-                registered_capital = self.get_element_by_css_selector('#Exhi_ExhFund')
-                registered_capital = registered_capital.text if registered_capital else ''
+                activate_second_picture = self.get_element_by_css_selector('#ProductThumbBar > li:nth-child(2) > img')
 
-                target_customer = self.get_element_by_css_selector('#Exhi_BuyerType')
-                target_customer = target_customer.text if target_customer else ''
+                if activate_second_picture:
+                    activate_second_picture.click()
+                    time.sleep(2)
+                    back_picture = self.get_element_by_css_selector('#ICImageMediumLarge')
+                back_picture = back_picture.get_attribute('src') if activate_second_picture and back_picture else ''
 
-                website = self.get_element_by_css_selector('#Exhi_WebSite')
-                website = website.text if website else ''
+                # 'Описание'
+                description = self.get_element_by_css_selector('.description[itemprop="description"]')
+                description_text = description.text if description else ''
+                description_html = description.get_attribute('innerHTML') if description else ''
 
                 product = {
-                    'address': address,
-                    'business_type': business_type,
-                    'city_province': city_province,
-                    'company_name': company_name,
-                    'exhibition_records': exhibition_records,
-                    'international_commercial_terms': international_commercial_terms,
-                    'main_products': main_products,
-                    'number_of_staff': number_of_staff,
-                    'post_code': post_code,
-                    'registered_capital': registered_capital,
-                    'target_customer': target_customer,
-                    'website': website,
+                    'name': name,
+                    'manufacturer': manufacturer,
+                    'colors': colors,
+                    'all_size': all_size,
+                    'disabled_size': disabled_size,
+                    'active_size': active_size,
+                    'price': price,
+                    'price_cleaned': price_cleaned,
+                    'front_picture': front_picture,
+                    'back_picture': back_picture,
+                    'description_text': description_text,
+                    'description_html': description_html,
+
                 }
 
             except (NoSuchElementException, TimeoutException):
@@ -181,76 +191,42 @@ class TestCantonfairSite(unittest.TestCase):
 
         return product
 
-    def save_exhibitors_data(self):
-        try:
-            with psycopg2.connect(dbname='cantonfair', user='cantonfair', password='cantonfair', host='localhost', port=5432) as connection:
-                with connection.cursor() as cursor:
-                    sql_string = """
-                        SELECT
-                            "url"
-                        FROM "exhibitor"
-                        WHERE is_done = false;
-                    """
-                    cursor.execute(sql_string)
+    def save_products_to_db(self):
+        with psycopg2.connect(dbname='fcmoto', user='fcmoto', password='fcmoto', host='localhost', port=5432) as connection:
+            try:
+                category_url = 'https://www.fc-moto.de/ru/Mototsikl/Mototsiklitnaya-odizhda/Mototsiklitnyrui-kurtki/Kozhanyrui-mototsiklitnyrui-kurtki'
+                product_urls = self.get_product_links(category_url)
+                for product_url in product_urls:
+                    product = self.get_product(product_url)
+                    if product:
+                        with connection.cursor() as cursor:
+                            sql_string = """
+                                INSERT INTO "product" ("product_url", "name_url", "back_picture", "colors", "description_html", "description_text", "front_picture", "manufacturer", "name", "price_cleaned")
+                                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                                RETURNING id;
+                            """
+                            parameters = ( product_url, product_url.split('/')[-1], product['back_picture'], product['colors'], product['description_html'], product['description_text'], product['front_picture'], product['manufacturer'], product['name'], product['price_cleaned'],)
+                            cursor.execute(sql_string, parameters)
+                            product_id = cursor.fetchone()[0]
+                            connection.commit()
+                            if product_id:
+                                all_size = product['all_size']
+                                active_size = product['active_size']
+                                for size in product['all_size']:
+                                    if size in active_size:
+                                        available = True
+                                    else:
+                                        available = False
+                                    sql_string = """
+                                        INSERT INTO "size" ("product_id", "available", "value")
+                                        VALUES (%s, %s, %s);
+                                    """
+                                    parameters = ( product_id, available, size,)
+                                    result = cursor.execute(sql_string, parameters)
+                                connection.commit()
 
-                    exhibitors = cursor.fetchall()
-
-                    for exhibitor in exhibitors:
-                        url = exhibitor[0]
-                        data = self.get_exhibitors_data(url)
-
-                        address = data['address']
-                        business_type = data['business_type']
-                        city_province = data['city_province']
-                        company_name = data['company_name']
-                        exhibition_records = data['exhibition_records']
-                        international_commercial_terms = data['international_commercial_terms']
-                        is_done = True
-                        main_products = data['main_products']
-                        number_of_staff = data['number_of_staff']
-                        post_code = data['post_code']
-                        registered_capital = data['registered_capital']
-                        target_customer = data['target_customer']
-                        website = data['website']
-
-
-                        sql_string = """
-                            UPDATE "exhibitor" SET
-                                   "address" = %s,
-                             "business_type" = %s,
-                             "city_province" = %s,
-                              "company_name" = %s,
-                        "exhibition_records" = %s,
-            "international_commercial_terms" = %s,
-                                   "is_done" = %s,
-                             "main_products" = %s,
-                           "number_of_staff" = %s,
-                                 "post_code" = %s,
-                        "registered_capital" = %s,
-                           "target_customer" = %s,
-                                   "website" = %s
-                            WHERE url=%s;
-                        """
-                        parameters = (
-                            address,
-                            business_type,
-                            city_province,
-                            company_name,
-                            exhibition_records,
-                            international_commercial_terms,
-                            is_done,
-                            main_products,
-                            number_of_staff,
-                            post_code,
-                            registered_capital,
-                            target_customer,
-                            website,
-                            url,
-                        )
-                        cursor.execute(sql_string, parameters)
-                        connection.commit()
-        except Exception as e:
-            self.logger.exception(str(e))
+            finally:
+                self.driver.quit()
 
     def convert_to_csv(self):
         with psycopg2.connect(dbname='fcmoto', user='fcmoto', password='fcmoto', host='localhost', port=5432) as connection:
@@ -616,54 +592,9 @@ class TestCantonfairSite(unittest.TestCase):
                         ]
                         csv_writer.writerow([item.encode('utf8').decode('utf8') for item in col_names])
 
-    def save_exhibitors_links(self):
-        category_list = [
-            'http://i.cantonfair.org.cn/en/SearchResult/Index?QueryType=2&KeyWord=&CategoryNo=411&StageOne=0&StageTwo=0&StageThree=0&Export=0&Import=0&Provinces=&Countries=&ShowMode=1&NewProduct=0&CF=0&OwnProduct=0&PayMode=&NewCompany=0&BrandCompany=0&ForeignTradeCompany=0&ManufacturCompany=0&CFCompany=0&OtherCompany=0&OEM=0&ODM=0&OBM=0&OrderBy=1&producttab=1',
-            'http://i.cantonfair.org.cn/en/SearchResult/Index?QueryType=2&KeyWord=&CategoryNo=412&StageOne=0&StageTwo=0&StageThree=0&Export=0&Import=0&Provinces=&Countries=&ShowMode=1&NewProduct=0&CF=0&OwnProduct=0&PayMode=&NewCompany=0&BrandCompany=0&ForeignTradeCompany=0&ManufacturCompany=0&CFCompany=0&OtherCompany=0&OEM=0&ODM=0&OBM=0&OrderBy=1&producttab=1',
-            'http://i.cantonfair.org.cn/en/SearchResult/Index?QueryType=2&KeyWord=&CategoryNo=410&StageOne=0&StageTwo=0&StageThree=0&Export=0&Import=0&Provinces=&Countries=&ShowMode=1&NewProduct=0&CF=0&OwnProduct=0&PayMode=&NewCompany=0&BrandCompany=0&ForeignTradeCompany=0&ManufacturCompany=0&CFCompany=0&OtherCompany=0&OEM=0&ODM=0&OBM=0&OrderBy=1&producttab=1',
-            'http://i.cantonfair.org.cn/en/SearchResult/Index?QueryType=2&KeyWord=&CategoryNo=414&StageOne=0&StageTwo=0&StageThree=0&Export=0&Import=0&Provinces=&Countries=&ShowMode=1&NewProduct=0&CF=0&OwnProduct=0&PayMode=&NewCompany=0&BrandCompany=0&ForeignTradeCompany=0&ManufacturCompany=0&CFCompany=0&OtherCompany=0&OEM=0&ODM=0&OBM=0&OrderBy=1&producttab=1',
-            'http://i.cantonfair.org.cn/en/SearchResult/Index?QueryType=2&KeyWord=&CategoryNo=403&StageOne=0&StageTwo=0&StageThree=0&Export=0&Import=0&Provinces=&Countries=&ShowMode=1&NewProduct=0&CF=0&OwnProduct=0&PayMode=&NewCompany=0&BrandCompany=0&ForeignTradeCompany=0&ManufacturCompany=0&CFCompany=0&OtherCompany=0&OEM=0&ODM=0&OBM=0&OrderBy=1&producttab=1',
-            'http://i.cantonfair.org.cn/en/SearchResult/Index?QueryType=2&KeyWord=&CategoryNo=404&StageOne=0&StageTwo=0&StageThree=0&Export=0&Import=0&Provinces=&Countries=&ShowMode=1&NewProduct=0&CF=0&OwnProduct=0&PayMode=&NewCompany=0&BrandCompany=0&ForeignTradeCompany=0&ManufacturCompany=0&CFCompany=0&OtherCompany=0&OEM=0&ODM=0&OBM=0&OrderBy=1&producttab=1',
-            'http://i.cantonfair.org.cn/en/SearchResult/Index?QueryType=2&KeyWord=&CategoryNo=405&StageOne=0&StageTwo=0&StageThree=0&Export=0&Import=0&Provinces=&Countries=&ShowMode=1&NewProduct=0&CF=0&OwnProduct=0&PayMode=&NewCompany=0&BrandCompany=0&ForeignTradeCompany=0&ManufacturCompany=0&CFCompany=0&OtherCompany=0&OEM=0&ODM=0&OBM=0&OrderBy=1&producttab=1',
-            'http://i.cantonfair.org.cn/en/SearchResult/Index?QueryType=2&KeyWord=&CategoryNo=408&StageOne=0&StageTwo=0&StageThree=0&Export=0&Import=0&Provinces=&Countries=&ShowMode=1&NewProduct=0&CF=0&OwnProduct=0&PayMode=&NewCompany=0&BrandCompany=0&ForeignTradeCompany=0&ManufacturCompany=0&CFCompany=0&OtherCompany=0&OEM=0&ODM=0&OBM=0&OrderBy=1&producttab=1',
-            'http://i.cantonfair.org.cn/en/SearchResult/Index?QueryType=2&KeyWord=&CategoryNo=454&StageOne=0&StageTwo=0&StageThree=0&Export=0&Import=0&Provinces=&Countries=&ShowMode=1&NewProduct=0&CF=0&OwnProduct=0&PayMode=&NewCompany=0&BrandCompany=0&ForeignTradeCompany=0&ManufacturCompany=0&CFCompany=0&OtherCompany=0&OEM=0&ODM=0&OBM=0&OrderBy=1&producttab=1',
-            'http://i.cantonfair.org.cn/en/SearchResult/Index?QueryType=2&KeyWord=&CategoryNo=455&StageOne=0&StageTwo=0&StageThree=0&Export=0&Import=0&Provinces=&Countries=&ShowMode=1&NewProduct=0&CF=0&OwnProduct=0&PayMode=&NewCompany=0&BrandCompany=0&ForeignTradeCompany=0&ManufacturCompany=0&CFCompany=0&OtherCompany=0&OEM=0&ODM=0&OBM=0&OrderBy=1&producttab=1',
-            'http://i.cantonfair.org.cn/en/SearchResult/Index?QueryType=2&KeyWord=&CategoryNo=451&StageOne=0&StageTwo=0&StageThree=0&Export=0&Import=0&Provinces=&Countries=&ShowMode=1&NewProduct=0&CF=0&OwnProduct=0&PayMode=&NewCompany=0&BrandCompany=0&ForeignTradeCompany=0&ManufacturCompany=0&CFCompany=0&OtherCompany=0&OEM=0&ODM=0&OBM=0&OrderBy=1&producttab=1',
-            'http://i.cantonfair.org.cn/en/SearchResult/Index?QueryType=2&KeyWord=&CategoryNo=401&StageOne=0&StageTwo=0&StageThree=0&Export=0&Import=0&Provinces=&Countries=&ShowMode=1&NewProduct=0&CF=0&OwnProduct=0&PayMode=&NewCompany=0&BrandCompany=0&ForeignTradeCompany=0&ManufacturCompany=0&CFCompany=0&OtherCompany=0&OEM=0&ODM=0&OBM=0&OrderBy=1&producttab=1',
-            'http://i.cantonfair.org.cn/en/SearchResult/Index?QueryType=2&KeyWord=&CategoryNo=402&StageOne=0&StageTwo=0&StageThree=0&Export=0&Import=0&Provinces=&Countries=&ShowMode=1&NewProduct=0&CF=0&OwnProduct=0&PayMode=&NewCompany=0&BrandCompany=0&ForeignTradeCompany=0&ManufacturCompany=0&CFCompany=0&OtherCompany=0&OEM=0&ODM=0&OBM=0&OrderBy=1&producttab=1',
-            'http://i.cantonfair.org.cn/en/SearchResult/Index?QueryType=2&KeyWord=&CategoryNo=406&StageOne=0&StageTwo=0&StageThree=0&Export=0&Import=0&Provinces=&Countries=&ShowMode=1&NewProduct=0&CF=0&OwnProduct=0&PayMode=&NewCompany=0&BrandCompany=0&ForeignTradeCompany=0&ManufacturCompany=0&CFCompany=0&OtherCompany=0&OEM=0&ODM=0&OBM=0&OrderBy=1&producttab=1',
-            'http://i.cantonfair.org.cn/en/SearchResult/Index?QueryType=2&KeyWord=&CategoryNo=407&StageOne=0&StageTwo=0&StageThree=0&Export=0&Import=0&Provinces=&Countries=&ShowMode=1&NewProduct=0&CF=0&OwnProduct=0&PayMode=&NewCompany=0&BrandCompany=0&ForeignTradeCompany=0&ManufacturCompany=0&CFCompany=0&OtherCompany=0&OEM=0&ODM=0&OBM=0&OrderBy=1&producttab=1',
-            'http://i.cantonfair.org.cn/en/SearchResult/Index?QueryType=2&KeyWord=&CategoryNo=415&StageOne=0&StageTwo=0&StageThree=0&Export=0&Import=0&Provinces=&Countries=&ShowMode=1&NewProduct=0&CF=0&OwnProduct=0&PayMode=&NewCompany=0&BrandCompany=0&ForeignTradeCompany=0&ManufacturCompany=0&CFCompany=0&OtherCompany=0&OEM=0&ODM=0&OBM=0&OrderBy=1&producttab=1',
-            'http://i.cantonfair.org.cn/en/SearchResult/Index?QueryType=2&KeyWord=&CategoryNo=416&StageOne=0&StageTwo=0&StageThree=0&Export=0&Import=0&Provinces=&Countries=&ShowMode=1&NewProduct=0&CF=0&OwnProduct=0&PayMode=&NewCompany=0&BrandCompany=0&ForeignTradeCompany=0&ManufacturCompany=0&CFCompany=0&OtherCompany=0&OEM=0&ODM=0&OBM=0&OrderBy=1&producttab=1',
-            'http://i.cantonfair.org.cn/en/SearchResult/Index?QueryType=2&KeyWord=&CategoryNo=427&StageOne=0&StageTwo=0&StageThree=0&Export=0&Import=0&Provinces=&Countries=&ShowMode=1&NewProduct=0&CF=0&OwnProduct=0&PayMode=&NewCompany=0&BrandCompany=0&ForeignTradeCompany=0&ManufacturCompany=0&CFCompany=0&OtherCompany=0&OEM=0&ODM=0&OBM=0&OrderBy=1&producttab=1',
-            'http://i.cantonfair.org.cn/en/SearchResult/Index?QueryType=2&KeyWord=&CategoryNo=453&StageOne=0&StageTwo=0&StageThree=0&Export=0&Import=0&Provinces=&Countries=&ShowMode=1&NewProduct=0&CF=0&OwnProduct=0&PayMode=&NewCompany=0&BrandCompany=0&ForeignTradeCompany=0&ManufacturCompany=0&CFCompany=0&OtherCompany=0&OEM=0&ODM=0&OBM=0&OrderBy=1&producttab=1',
-            'http://i.cantonfair.org.cn/en/SearchResult/Index?QueryType=2&KeyWord=&CategoryNo=&StageOne=1&StageTwo=0&StageThree=0&Export=0&Import=1&Provinces=&Countries=&ShowMode=1&NewProduct=0&CF=0&OwnProduct=0&PayMode=&NewCompany=0&BrandCompany=0&ForeignTradeCompany=0&ManufacturCompany=0&CFCompany=0&OtherCompany=0&OEM=0&ODM=0&OBM=0&OrderBy=1&producttab=1',
-        ]
-
-        for category_url in category_list:
-            max_page, category = self.get_category_max_page(category_url)
-            with psycopg2.connect(dbname='cantonfair', user='cantonfair', password='cantonfair', host='localhost', port=5432) as connection:
-                with connection.cursor() as cursor:
-                    for link in self.get_exhibitors_links(category_url, max_page):
-                        sql_string = """
-                            INSERT INTO "exhibitor" ("url", "category_name")
-                            VALUES (%s, %s)
-                            ON CONFLICT ("url")
-                            DO
-                                UPDATE
-                                    SET url = %s, category_name = %s;
-                        """
-                        parameters = ( link, category, link, category)
-                        cursor.execute(sql_string, parameters)
-                        connection.commit()
-
-
     def test_main(self):
         # self.save_products_to_db()
-        # self.convert_to_csv()
-        self.save_exhibitors_links()
-        # self.save_exhibitors_data()
-        self.driver.quit()
+        self.convert_to_csv()
 
 if __name__ == '__main__':
     unittest.main()
