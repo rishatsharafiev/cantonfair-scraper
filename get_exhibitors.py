@@ -43,7 +43,7 @@ class TestCantonfairSite(unittest.TestCase):
         try:
             driver.get(category_url)
 
-            initial_wait = WebDriverWait(driver, 60*60)
+            initial_wait = WebDriverWait(driver, 5*60)
             initial_wait.until(
                 EC.presence_of_element_located((By.CSS_SELECTOR, '#pagearea'))
             )
@@ -71,14 +71,14 @@ class TestCantonfairSite(unittest.TestCase):
             try:
                 driver.get(category_url)
 
-                initial_wait = WebDriverWait(driver, 3*60)
+                initial_wait = WebDriverWait(driver, 5*60)
                 initial_wait.until(
                     EC.presence_of_element_located((By.CSS_SELECTOR, '#pagearea'))
                 )
 
                 links.extend([link.get_attribute('href') for link in self.get_elements_by_css_selector('#gjh_pro_result .czs-list > .min > dl > dt > a[target="_blank"]')])
 
-                common_wait = WebDriverWait(driver, 3*60)
+                common_wait = WebDriverWait(driver, 5*60)
                 for page_id in range(2, max_page + 1):
                     print(page_id)
                     page_button = self.get_element_by_css_selector('.pagenumber > a[_pageindex="{page_id}"'.format(page_id=page_id))
@@ -117,7 +117,7 @@ class TestCantonfairSite(unittest.TestCase):
         try:
             driver.get(exhibitors_url)
             try:
-                initial_wait = WebDriverWait(driver, 3*60)
+                initial_wait = WebDriverWait(driver, 5*60)
                 initial_wait.until(
                     EC.presence_of_element_located((By.CSS_SELECTOR, '#content .cright'))
                 )
