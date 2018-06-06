@@ -112,78 +112,66 @@ class TestCantonfairSite(unittest.TestCase):
             elements = None
         return elements
 
-    def get_product(self, product_url):
+    def get_exhibitors_data(self, exhibitors_url):
         driver = self.driver
         product = None
         try:
-            driver.get(product_url)
+            driver.get(exhibitors_url)
             try:
                 initial_wait = WebDriverWait(driver, 3*60)
                 initial_wait.until(
-                    EC.presence_of_element_located((By.CSS_SELECTOR, '.ContentAreaWrapper'))
+                    EC.presence_of_element_located((By.CSS_SELECTOR, '#content .cright'))
                 )
 
-                common_wait = WebDriverWait(driver, 3*60)
+                address = self.get_element_by_css_selector('#Exhi_Address')
+                address = address.text if address else ''
 
-                # 'Наименование',
-                name = self.get_element_by_css_selector('.ICProductVariationArea [itemprop="name"]')
-                name = name.text if name else ''
+                business_type = self.get_element_by_css_selector('#Exhi_TypeName')
+                business_type = business_type.text if business_type else ''
 
-                # 'Производитель',
-                manufacturer = self.get_element_by_css_selector('.ICProductVariationArea [itemprop="manufacturer"]')
-                manufacturer = manufacturer.text if manufacturer else ''
+                city_province = self.get_element_by_css_selector('#Exhi_Province')
+                city_province = city_province.text if city_province else ''
 
-                # 'Цвета',
-                colors = self.get_element_by_css_selector('.ICVariationSelect .Headline.image .Bold.Value')
-                colors = colors.text if colors else ''
+                company_name = self.get_element_by_css_selector('#Exhi_Name')
+                company_name = company_name.text if company_name else ''
 
-                # 'Все размеры',
-                all_size = self.get_elements_by_css_selector('.ICVariationSelect li > button')
-                all_size = set([size.text for size in all_size] if all_size else [])
+                exhibition_records = self.get_element_by_css_selector('#Exhi_Record')
+                exhibition_records = exhibition_records.text if exhibition_records else ''
 
-                # 'Неактивные размеры',
-                disabled_size = self.get_elements_by_css_selector('.ICVariationSelect li.disabled > button')
-                disabled_size = set([size.text for size in disabled_size] if disabled_size else [])
+                international_commercial_terms = self.get_element_by_css_selector('#Exhi_OEMode')
+                international_commercial_terms = international_commercial_terms.text if international_commercial_terms else ''
 
-                # 'Активные размеры',
-                active_size = all_size.difference(disabled_size)
+                main_products = self.get_element_by_css_selector('#Exhi_KeyWord')
+                main_products = main_products.text if main_products else ''
 
-                # 'Цена',
-                price = self.get_element_by_css_selector('.PriceArea .Price')
-                price = price.text if price else ''
-                price_cleaned = price.replace('руб.', '').replace(' ', '').replace(',', '.')
+                number_of_staff = self.get_element_by_css_selector('#Exhi_PeopleNum')
+                number_of_staff = number_of_staff.text if number_of_staff else ''
 
-                # 'Фотография'
-                front_picture = self.get_element_by_css_selector('#ICImageMediumLarge')
-                front_picture = front_picture.get_attribute('src') if front_picture else ''
+                post_code = self.get_element_by_css_selector('#Exhi_ZipCode')
+                post_code = post_code.text if post_code else ''
 
-                activate_second_picture = self.get_element_by_css_selector('#ProductThumbBar > li:nth-child(2) > img')
+                registered_capital = self.get_element_by_css_selector('#Exhi_ExhFund')
+                registered_capital = registered_capital.text if registered_capital else ''
 
-                if activate_second_picture:
-                    activate_second_picture.click()
-                    time.sleep(2)
-                    back_picture = self.get_element_by_css_selector('#ICImageMediumLarge')
-                back_picture = back_picture.get_attribute('src') if activate_second_picture and back_picture else ''
+                target_customer = self.get_element_by_css_selector('#Exhi_BuyerType')
+                target_customer = target_customer.text if target_customer else ''
 
-                # 'Описание'
-                description = self.get_element_by_css_selector('.description[itemprop="description"]')
-                description_text = description.text if description else ''
-                description_html = description.get_attribute('innerHTML') if description else ''
+                website = self.get_element_by_css_selector('#Exhi_WebSite')
+                website = website.text if website else ''
 
                 product = {
-                    'name': name,
-                    'manufacturer': manufacturer,
-                    'colors': colors,
-                    'all_size': all_size,
-                    'disabled_size': disabled_size,
-                    'active_size': active_size,
-                    'price': price,
-                    'price_cleaned': price_cleaned,
-                    'front_picture': front_picture,
-                    'back_picture': back_picture,
-                    'description_text': description_text,
-                    'description_html': description_html,
-
+                    'address': address,
+                    'business_type': business_type,
+                    'city_province': city_province,
+                    'company_name': company_name,
+                    'exhibition_records': exhibition_records,
+                    'international_commercial_terms': international_commercial_terms,
+                    'main_products': main_products,
+                    'number_of_staff': number_of_staff,
+                    'post_code': post_code,
+                    'registered_capital': registered_capital,
+                    'target_customer': target_customer,
+                    'website': website,
                 }
 
             except (NoSuchElementException, TimeoutException):
@@ -194,41 +182,73 @@ class TestCantonfairSite(unittest.TestCase):
 
         return product
 
-    def save_products_to_db(self):
+    def save_exhibitors_data(self):
         with psycopg2.connect(dbname='cantonfair', user='cantonfair', password='cantonfair', host='localhost', port=5432) as connection:
-            try:
+            with connection.cursor() as cursor:
+                sql_string = """
+                    SELECT
+                        "url"
+                    FROM "exhibitor"
+                    WHERE is_done = false;
+                """
+                cursor.execute(sql_string)
 
-                for product_url in product_urls:
-                    product = self.get_product(product_url)
-                    if product:
-                        with connection.cursor() as cursor:
-                            sql_string = """
-                                INSERT INTO "product" ("product_url", "name_url", "back_picture", "colors", "description_html", "description_text", "front_picture", "manufacturer", "name", "price_cleaned")
-                                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-                                RETURNING id;
-                            """
-                            parameters = ( product_url, product_url.split('/')[-1], product['back_picture'], product['colors'], product['description_html'], product['description_text'], product['front_picture'], product['manufacturer'], product['name'], product['price_cleaned'],)
-                            cursor.execute(sql_string, parameters)
-                            product_id = cursor.fetchone()[0]
-                            connection.commit()
-                            if product_id:
-                                all_size = product['all_size']
-                                active_size = product['active_size']
-                                for size in product['all_size']:
-                                    if size in active_size:
-                                        available = True
-                                    else:
-                                        available = False
-                                    sql_string = """
-                                        INSERT INTO "size" ("product_id", "available", "value")
-                                        VALUES (%s, %s, %s);
-                                    """
-                                    parameters = ( product_id, available, size,)
-                                    result = cursor.execute(sql_string, parameters)
-                                connection.commit()
+                exhibitors = cursor.fetchall()
 
-            finally:
-                self.driver.quit()
+                for exhibitor in exhibitors:
+                    url = exhibitor[0]
+                    data = self.get_exhibitors_data(url)
+
+                    address = data['address']
+                    business_type = data['business_type']
+                    city_province = data['city_province']
+                    company_name = data['company_name']
+                    exhibition_records = data['exhibition_records']
+                    international_commercial_terms = data['international_commercial_terms']
+                    is_done = True
+                    main_products = data['main_products']
+                    number_of_staff = data['number_of_staff']
+                    post_code = data['post_code']
+                    registered_capital = data['registered_capital']
+                    target_customer = data['target_customer']
+                    website = data['website']
+
+
+                    sql_string = """
+                        UPDATE "exhibitor" SET
+                               "address" = %s,
+                         "business_type" = %s,
+                         "city_province" = %s,
+                          "company_name" = %s,
+                    "exhibition_records" = %s,
+        "international_commercial_terms" = %s,
+                               "is_done" = %s,
+                         "main_products" = %s,
+                       "number_of_staff" = %s,
+                             "post_code" = %s,
+                    "registered_capital" = %s,
+                       "target_customer" = %s,
+                               "website" = %s
+                        WHERE url=%s;
+                    """
+                    parameters = (
+                        address,
+                        business_type,
+                        city_province,
+                        company_name,
+                        exhibition_records,
+                        international_commercial_terms,
+                        is_done,
+                        main_products,
+                        number_of_staff,
+                        post_code,
+                        registered_capital,
+                        target_customer,
+                        website,
+                        url,
+                    )
+                    cursor.execute(sql_string, parameters)
+                    connection.commit()
 
     def convert_to_csv(self):
         with psycopg2.connect(dbname='fcmoto', user='fcmoto', password='fcmoto', host='localhost', port=5432) as connection:
@@ -639,7 +659,8 @@ class TestCantonfairSite(unittest.TestCase):
     def test_main(self):
         # self.save_products_to_db()
         # self.convert_to_csv()
-        self.save_exhibitors_links()
+        # self.save_exhibitors_links()
+        self.save_exhibitors_data()
 
 if __name__ == '__main__':
     unittest.main()
