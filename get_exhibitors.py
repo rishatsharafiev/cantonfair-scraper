@@ -9,7 +9,7 @@ load_dotenv(DOTENV_PATH)
 
 import logging, time
 import unittest, json
-import psycopg2, csv, math
+import psycopg2, csv, math, re
 from datetime import datetime
 from selenium import webdriver
 from selenium.webdriver.common.by import By
@@ -253,366 +253,84 @@ class TestCantonfairSite(unittest.TestCase):
             self.logger.exception(str(e))
 
     def convert_to_csv(self):
-        with psycopg2.connect(dbname='fcmoto', user='fcmoto', password='fcmoto', host='localhost', port=5432) as connection:
+        with psycopg2.connect(dbname='cantonfair', user='cantonfair', password='cantonfair', host='localhost', port=5432) as connection:
             with connection.cursor() as cursor:
                 with open(self.write_filename, 'w', encoding='utf-8') as write_file:
-                    csv_writer = csv.writer(write_file, delimiter=',', quotechar='"', quoting=csv.QUOTE_ALL, lineterminator='\n')
+                    csv_writer = csv.writer(write_file, delimiter=',', quotechar="'", quoting=csv.QUOTE_ALL, lineterminator='\n')
                     # заголовок
                     col_names = [
-                        'Наименование',
-                        'Наименование артикула',
-                        'Код артикула',
-                        'Валюта',
-                        'Цена',
-                        'Доступен для заказа',
-                        'Зачеркнутая цена',
-                        'Закупочная цена',
-                        'В наличии',
-                        'Основной артикул',
-                        'В наличии @Склад в Москве',
-                        'В наличии @Склад в Европе',
-                        'Краткое описание',
-                        'Описание',
-                        'Наклейка',
-                        'Статус',
-                        'Тип товаров',
-                        'Теги',
-                        'Облагается налогом',
-                        'Заголовок',
-                        'META Keywords',
-                        'META Description',
-                        'Ссылка на витрину',
-                        'Адрес видео на YouTube или Vimeo',
-                        'Дополнительные параметры',
-                        'Производитель',
-                        'Бренд',
-                        'Подходящие модели автомобилей',
-                        'Вес',
-                        'Страна происхождения',
-                        'Пол',
-                        'Цвет',
-                        'Материал',
-                        'Материал подошвы',
-                        'Уровень',
-                        'Максимальный вес пользователя',
-                        'Размер',
-                        'Изображения',
-                        'Изображения',
-                    ]
-                    csv_writer.writerow([item.encode('utf8').decode('utf8') for item in col_names])
-                    # подзаголовок 1
-                    col_names = [
-                        '<Категория>',
-                        '',
-                        '',
-                        '',
-                        '',
-                        '',
-                        '',
-                        '',
-                        '',
-                        '',
-                        '',
-                        '',
-                        '',
-                        '',
-                        '',
-                        '',
-                        '',
-                        '',
-                        '',
-                        '',
-                        '',
-                        '',
-                        '<Ссылка на категорию>',
-                        '',
-                        '',
-                        '',
-                        '',
-                        '',
-                        '',
-                        '',
-                        '',
-                        '',
-                        '',
-                        '',
-                        '',
-                        '',
-                        '',
-                        '',
-                        '',
-                    ]
-                    csv_writer.writerow([item.encode('utf8').decode('utf8') for item in col_names])
-                    # подзаголовок 2
-                    col_names = [
-                        '<Подкатегория>',
-                        '',
-                        '',
-                        '',
-                        '',
-                        '',
-                        '',
-                        '',
-                        '',
-                        '',
-                        '',
-                        '',
-                        '',
-                        '',
-                        '',
-                        '',
-                        '',
-                        '',
-                        '',
-                        '',
-                        '',
-                        '',
-                        '<Ссылка на подкатегорию>',
-                        '',
-                        '',
-                        '',
-                        '',
-                        '',
-                        '',
-                        '',
-                        '',
-                        '',
-                        '',
-                        '',
-                        '',
-                        '',
-                        '',
-                        '',
-                        '',
+                        "company_name",
+                        "city_province",
+                        "website",
+                        "main_products",
+                        "address",
+                        "post_code",
+                        "business_type",
+                        "category_name",
+                        "exhibition_records",
+                        "international_commercial_terms",
+                        "number_of_staff",
+                        "registered_capital (YUAN)",
+                        "target_customer",
+                        "url"
                     ]
                     csv_writer.writerow([item.encode('utf8').decode('utf8') for item in col_names])
 
-                    cursor.execute('SELECT DISTINCT "id" FROM "product";')
+                    sql_string = """
+                        SELECT
+                            "company_name",
+                            "city_province",
+                            "website",
+                            "main_products",
+                            "address",
+                            "post_code",
+                            "business_type",
+                            "category_name",
+                            "exhibition_records",
+                            "international_commercial_terms",
+                            "number_of_staff",
+                            "registered_capital",
+                            "target_customer",
+                            "url"
+                        FROM "exhibitor"
+                        WHERE is_done = TRUE
+                        LIMIT 100;
+                    """
+                    cursor.execute(sql_string)
+
                     for row in cursor.fetchall():
-                        sql_string = """
-                            SELECT
-                                "back_picture",
-                                "colors",
-                                "description_html",
-                                "description_text",
-                                "front_picture",
-                                "manufacturer",
-                                "name",
-                                "name_url",
-                                "price_cleaned",
-                                "product_url",
-                                "available",
-                                "value"
-                            FROM "product"
-                            INNER JOIN "size" ON "product"."id" = "size"."product_id"
-                            WHERE "product"."id" = %s
-                            ORDER BY "value";
-                        """
-                        parameters = (row[0], )
-                        cursor.execute(sql_string, parameters)
+                        company_name = row[0]
+                        city_province = row[1]
+                        website = row[2]
+                        main_products = row[3]
+                        address = row[4]
+                        post_code = row[5]
+                        business_type = row[6]
+                        category_name = row[7]
+                        exhibition_records = row[8]
+                        international_commercial_terms = row[9]
+                        number_of_staff = row[10]
+                        registered_capital = row[11]
+                        target_customer = row[12]
+                        url = row[13]
 
-                        product_list = []
+                        registered_capital = re.sub('[^0-9]','', registered_capital)
 
-                        counter = 1
-                        all_size=[]
-                        items = list(cursor.fetchall())
-                        for item in items:
-                            back_picture = item[0].replace('"', "'")
-                            colors = item[1].replace('"', "'")
-                            description_html = item[2].replace('"', "'")
-                            description_text = item[3].replace('"', "'")
-                            front_picture = item[4]
-                            manufacturer = item[5]
-                            name = item[6].replace('"', "'")
-                            name_url = item[7].replace('"', "'")
-                            price_cleaned = math.ceil(float(item[8]))
-                            product_url = item[9]
-                            available = item[10]
-                            value = item[11].replace('"', "'")
-
-                            all_size.append(value)
-                            sex = 'мужской'
-                            keywords = ", ".join(name.split(' '))
-
-                            if counter == 1:
-                                item = [
-                                    name,
-                                    '{size}, {colors}'.format(size=value, colors=colors),
-                                    '',
-                                    'RUB',
-                                    price_cleaned,
-                                    1 if available else 0,
-                                    '0',
-                                    price_cleaned,
-                                    1 if available else 0,
-                                    '',
-                                    '0',
-                                    1 if available else 0,
-                                    name,
-                                    description_html,
-                                    '',
-                                    '1',
-                                    'Одежда',
-                                    keywords,
-                                    '',
-                                    name,
-                                    keywords,
-                                    description_text,
-                                    name_url,
-                                    '',
-                                    '',
-                                    manufacturer,
-                                    manufacturer,
-                                    '',
-                                    '',
-                                    '',
-                                    '',
-                                    '{colors}'.format(colors=colors),
-                                    '',
-                                    '',
-                                    '',
-                                    '',
-                                    value,
-                                    front_picture,
-                                    back_picture,
-                                ]
-                                product_list.append(item)
-                            else:
-                                item = [
-                                    name,
-                                    '{size}, {colors}'.format(size=value, colors=colors),
-                                    '',
-                                    'RUB',
-                                    price_cleaned,
-                                    1 if available else 0,
-                                    '0',
-                                    price_cleaned,
-                                    1 if available else 0,
-                                    '',
-                                    '0',
-                                    1 if available else 0,
-                                    name,
-                                    description_html,
-                                    '',
-                                    '1',
-                                    'Одежда',
-                                    keywords,
-                                    '',
-                                    name,
-                                    keywords,
-                                    description_text,
-                                    name_url,
-                                    '',
-                                    '',
-                                    manufacturer,
-                                    manufacturer,
-                                    '',
-                                    '',
-                                    '',
-                                    '',
-                                    '{colors}'.format(colors=colors),
-                                    '',
-                                    '',
-                                    '',
-                                    '',
-                                    value,
-                                    '',
-                                    '',
-                                ]
-                                product_list.append(item)
-
-
-                            if len(items) == counter:
-                                all_size = ",".join(sorted(all_size))
-                                available_order = sum([item[10] for item in items])
-
-                                main_item = [
-                                    name,
-                                    '',
-                                    '',
-                                    'RUB',
-                                    price_cleaned,
-                                    available_order,
-                                    '0',
-                                    price_cleaned,
-                                    available_order,
-                                    '',
-                                    '0',
-                                    available_order,
-                                    name,
-                                    description_html,
-                                    '',
-                                    '1',
-                                    'Одежда',
-                                    keywords,
-                                    '',
-                                    name,
-                                    keywords,
-                                    description_text,
-                                    name_url,
-                                    '',
-                                    '',
-                                    manufacturer,
-                                    manufacturer,
-                                    '',
-                                    '',
-                                    '',
-                                    sex,
-                                    '<{{{colors}}}>'.format(colors=colors),
-                                    '',
-                                    '',
-                                    '',
-                                    '',
-                                    '<{{{all_size}}}>'.format(all_size=all_size),
-                                    front_picture,
-                                    back_picture,
-                                ]
-                                product_list.insert(0, main_item)
-                            counter+=1
-
-                        # write end rows
-                        [csv_writer.writerow(item) for item in product_list]
-                        # write ending row
                         col_names = [
-                            '',
-                            '',
-                            '',
-                            '',
-                            '',
-                            '',
-                            '',
-                            '',
-                            '',
-                            '',
-                            '',
-                            '',
-                            '',
-                            '',
-                            '',
-                            '',
-                            '',
-                            '',
-                            '',
-                            '',
-                            '',
-                            '',
-                            '',
-                            '',
-                            '',
-                            '',
-                            '',
-                            '',
-                            '',
-                            '',
-                            '',
-                            '',
-                            '',
-                            '',
-                            '',
-                            '',
-                            '',
-                            '',
-                            '',
+                            company_name.strip(',').replace("'", ''),
+                            city_province.strip(',').replace("'", ''),
+                            website.strip(',').replace("'", ''),
+                            main_products.strip(',').replace("'", ''),
+                            address.strip(',').replace("'", ''),
+                            post_code.strip(',').replace("'", ''),
+                            business_type.strip(',').replace("'", ''),
+                            category_name.strip(',').replace("'", ''),
+                            exhibition_records.strip(',').replace("'", ''),
+                            international_commercial_terms.strip(',').replace("'", ''),
+                            number_of_staff.strip(',').replace('People', ''),
+                            registered_capital,
+                            target_customer.strip(',').replace("'", ''),
+                            url.strip(',').replace("'", ''),
                         ]
                         csv_writer.writerow([item.encode('utf8').decode('utf8') for item in col_names])
 
@@ -661,8 +379,9 @@ class TestCantonfairSite(unittest.TestCase):
     def test_main(self):
         # self.save_products_to_db()
         # self.convert_to_csv()
-        self.save_exhibitors_links()
+        # self.save_exhibitors_links()
         # self.save_exhibitors_data()
+        self.convert_to_csv()
         self.driver.quit()
 
 if __name__ == '__main__':
