@@ -293,8 +293,7 @@ class TestCantonfairSite(unittest.TestCase):
                             "target_customer",
                             "url"
                         FROM "exhibitor"
-                        WHERE is_done = TRUE
-                        LIMIT 100;
+                        WHERE is_done = TRUE;
                     """
                     cursor.execute(sql_string)
 
