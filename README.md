@@ -56,6 +56,14 @@ https://selenium-python.readthedocs.io
 sudo apt-get install xvfb -y
 ```
 
+### Install Chrome Binary
+```
+wget -q -O - https://dl-ssl.google.com/linux/linux_signing_key.pub | sudo apt-key add -
+sudo sh -c 'echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" >> /etc/apt/sources.list.d/google.list'
+sudo apt-get update
+sudo apt-get install google-chrome-stable
+```
+
 ### Install Drivers
 PhantomJS (Deprecated)
 http://phantomjs.org/download.html
@@ -66,6 +74,10 @@ https://selenium-python.readthedocs.io/installation.html#downloading-python-bind
 ### Selenium Grid
 http://automation-remarks.com/nastraivaiem-selenium-grid-za-5-minut/
 
+### PostgreSQL Installation
+```
+sudo apt-get install postgresql-9.6
+```
 
 ### PostgreSQL Database
 # https://medium.com/coding-blocks/creating-user-database-and-adding-access-on-postgresql-8bfcd2f4a91e
